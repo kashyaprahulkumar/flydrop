@@ -1096,8 +1096,8 @@
                     rxFileMap.set(data.id, {
                         name: data.name,
                         mime: data.mime,
-                        totalBytes: data.totalBytes,
-                        totalChunks: data.totalChunks,
+                        totalBytes: Number(data.totalBytes) || 1,
+                        totalChunks: Number(data.totalChunks) || 1,
                         chunks: new Array(data.totalChunks),
                         receivedChunks: 0,
                         receivedBytes: 0,
@@ -1105,28 +1105,32 @@
                         expectedHash: data.hash
                     });
                     if (progressBox) progressBox.classList.remove('hidden');
-                    if (fileInfoBadge) fileInfoBadge.innerText = `${data.name} (${Math.round(data.totalBytes/1024)} KB)`;
+                    if (fileInfoBadge) fileInfoBadge.innerText = `${data.name} (${Math.round((data.totalBytes || 0)/1024)} KB)`;
                     if (progressTitle) progressTitle.innerText = `Receiving ${data.name}...`;
                 } else if (data.type === 'FILE_CHUNK') {
                     const item = rxFileMap.get(data.id);
-                    if (item) {
+                    if (item && item.totalChunks > 0) {
                         const chunkBytes = base64ToUint8Array(data.chunk);
-                        item.chunks[data.index] = chunkBytes;
-                        item.receivedChunks++;
-                        item.receivedBytes += chunkBytes.byteLength;
+                        // Prevent duplicate chunk double-counting
+                        if (!item.chunks[data.index]) {
+                            item.chunks[data.index] = chunkBytes;
+                            item.receivedChunks++;
+                            item.receivedBytes += chunkBytes.byteLength;
+                        }
 
-                        const pct = Math.round((item.receivedBytes / item.totalBytes) * 100);
+                        // Strictly clamp progress percentage between 0% and 100%
+                        const pct = Math.min(100, Math.max(0, Math.round((item.receivedChunks / item.totalChunks) * 100)));
                         if (progressBarFill) progressBarFill.style.width = `${pct}%`;
                         if (progressPercent) progressPercent.innerText = `${pct}%`;
                         if (chunkCountText) chunkCountText.innerText = `${item.receivedChunks}/${item.totalChunks} Chunks`;
 
                         const elapsed = (Date.now() - item.startTime) / 1000;
-                        if (elapsed > 0) {
+                        if (elapsed > 0 && item.receivedBytes > 0) {
                             const bytesPerSec = item.receivedBytes / elapsed;
                             const kbSec = bytesPerSec / 1024;
                             if (rxSpeedText) rxSpeedText.innerText = `${Math.round(kbSec)} KB/s`;
-                            const remBytes = item.totalBytes - item.receivedBytes;
-                            const etaSec = Math.ceil(remBytes / bytesPerSec);
+                            const remBytes = Math.max(0, item.totalBytes - item.receivedBytes);
+                            const etaSec = Math.max(0, Math.ceil(remBytes / bytesPerSec));
                             if (rxEtaText) rxEtaText.innerText = `ETA: ~${etaSec}s`;
                         }
                     }
@@ -1422,7 +1426,7 @@
             }
 
             const receivedCount = qrRxState.chunks.size;
-            const pct = Math.round((receivedCount / total) * 100);
+            const pct = Math.min(100, Math.max(0, Math.round((receivedCount / total) * 100)));
             if (progressBarFill) progressBarFill.style.width = `${pct}%`;
             if (progressPercent) progressPercent.innerText = `${pct}%`;
             if (chunkCountText) chunkCountText.innerText = `${receivedCount}/${total} Frames`;
