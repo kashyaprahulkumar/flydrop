@@ -168,7 +168,6 @@
             max-height: min(var(--qr-max-size, 220px), 28vh);
         }
 
-        /* Seamless boundary-less overlay for Laptop/Desktop Focus Mode */
         .qr-focus-overlay {
             position: fixed !important;
             inset: 0 !important;
@@ -420,15 +419,35 @@
                         <div class="scan-laser"></div>
                     </div>
 
-                    <!-- PROGRESS BAR VIEW -->
-                    <div id="progressBox" class="hidden inner-card p-3 space-y-2 text-center">
-                        <div class="text-[11px] font-black text-slate-800" id="progressTitle">Capturing Decimen Stream...</div>
-                        <div id="progressPercent" class="text-2xl font-black text-indigo-600">0%</div>
-                        <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                            <div id="progressBarFill" class="h-full w-0 bg-indigo-500 transition-all duration-150"></div>
+                    <!-- DETAILED PROGRESS HUD VIEW -->
+                    <div id="progressBox" class="hidden inner-card p-3 space-y-2 text-center bg-white border border-indigo-100 shadow-sm">
+                        <!-- HEADER WITH FILE META -->
+                        <div class="flex items-center justify-between pb-1.5 border-b border-slate-100 text-left">
+                            <div>
+                                <div id="progressTitle" class="text-[11px] font-black text-slate-800 truncate max-w-[180px]">Capturing Payload...</div>
+                                <div id="fileInfoBadge" class="text-[9px] font-bold text-indigo-600 mono-font">Reading Stream...</div>
+                            </div>
+                            <div class="text-right">
+                                <div id="progressPercent" class="text-xl font-black text-indigo-600">0%</div>
+                                <div id="chunkCountText" class="text-[8px] font-extrabold text-slate-400 mono-font">0/0 Drops</div>
+                            </div>
                         </div>
-                        <div id="chunkMatrix" class="flex flex-wrap gap-1 max-h-16 overflow-y-auto p-1 bg-white rounded-lg"></div>
-                        <button id="cancelReceiveBtn" class="w-full py-1.5 bg-rose-50 text-rose-600 text-xs font-bold rounded-lg">✕ Cancel</button>
+
+                        <!-- PROGRESS BAR -->
+                        <div class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden relative">
+                            <div id="progressBarFill" class="h-full w-0 bg-gradient-to-r from-indigo-500 to-teal-400 transition-all duration-150"></div>
+                        </div>
+
+                        <!-- LIVE SPEED & ETA ROW -->
+                        <div class="flex items-center justify-between text-[9px] font-bold text-slate-500 px-1">
+                            <span id="rxSpeedText" class="mono-font text-emerald-600">0 KB/s</span>
+                            <span id="rxEtaText" class="mono-font">ETA: --s</span>
+                        </div>
+
+                        <!-- CHUNK MATRIX VISUALIZATION -->
+                        <div id="chunkMatrix" class="flex flex-wrap gap-1 max-h-16 overflow-y-auto p-1.5 bg-slate-50 rounded-lg border border-slate-100"></div>
+
+                        <button id="cancelReceiveBtn" class="w-full py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold rounded-lg transition-colors">✕ Cancel Transfer</button>
                     </div>
 
                     <!-- RECONSTRUCTED OUTPUT -->
@@ -636,7 +655,6 @@
             };
         })();
 
-        // Safe PeerJS wrapper
         function createSafePeer(id) {
             try {
                 if (typeof Peer === 'undefined') return null;
@@ -836,7 +854,6 @@
             }
         }
 
-        // Discovery and Presence Helpers
         let localHashedIp = null;
         let discoverySource = null;
         let presenceInterval = null;
@@ -957,9 +974,11 @@
         let peerConn = null;
         let myReceiverPin = null;
 
+        let rxStartTime = 0;
+        let rxTotalBytesTransferred = 0;
+
         let displayName = localStorage.getItem('flydrop_display_name') || 'Peer ' + Math.floor(1000 + Math.random() * 9000);
 
-        // TOP-LEVEL UTILITY & RENDER FUNCTIONS
         function getFileIcon(name) {
             const ext = (name || '').split('.').pop().toLowerCase();
             if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext)) return '🖼️';
@@ -1155,6 +1174,11 @@
         const progressBarFill = document.getElementById('progressBarFill');
         const cancelReceiveBtn = document.getElementById('cancelReceiveBtn');
 
+        const fileInfoBadge = document.getElementById('fileInfoBadge');
+        const chunkCountText = document.getElementById('chunkCountText');
+        const rxSpeedText = document.getElementById('rxSpeedText');
+        const rxEtaText = document.getElementById('rxEtaText');
+
         const receivedBox = document.getElementById('receivedBox');
         const receivedBatchList = document.getElementById('receivedBatchList');
         const receivedTextBox = document.getElementById('receivedTextBox');
@@ -1172,7 +1196,6 @@
         const saveSettingsBtn = document.getElementById('saveSettingsBtn');
         const modalCloseBtn = document.getElementById('modalCloseBtn');
 
-        // User Profile Setup
         if (userNameText) userNameText.innerText = displayName;
         if (userAvatarText) userAvatarText.innerText = displayName[0].toUpperCase();
 
@@ -1285,7 +1308,6 @@
             }
         }
 
-        // File and Dropzone Events
         if (dropzone) {
             dropzone.onclick = () => { SoundFX.playClick(); fileInput.click(); };
             dropzone.ondragover = (e) => { e.preventDefault(); dropzone.classList.add('border-indigo-400'); };
@@ -1333,7 +1355,6 @@
             };
         }
 
-        // Settings Modal Handlers
         openSettingsBtn.onclick = () => { SoundFX.playClick(); settingsModal.classList.remove('hidden'); };
         if (openSettingsFromCardBtn) openSettingsFromCardBtn.onclick = () => { SoundFX.playClick(); settingsModal.classList.remove('hidden'); };
         closeSettingsModalBtn.onclick = saveSettingsBtn.onclick = () => { SoundFX.playClick(); settingsModal.classList.add('hidden'); };
@@ -1604,6 +1625,18 @@
         let rxPeelingDecoder = null;
         let rxTotalK = 0, rxBytes = 0, rxSha = '', rxMime = '', rxName = '';
 
+        function createMatrixGrid(total) {
+            const chunkMatrix = document.getElementById('chunkMatrix');
+            if (!chunkMatrix) return;
+            chunkMatrix.innerHTML = '';
+            for (let i = 0; i < total; i++) {
+                const div = document.createElement('div');
+                div.className = 'w-2 h-2 rounded-sm bg-slate-200 transition-all';
+                div.id = `chunk-box-${i}`;
+                chunkMatrix.appendChild(div);
+            }
+        }
+
         function processDecimenOpticalFrame(rawText) {
             const parts = rawText.split(':');
             if (parts.length < 8) return;
@@ -1618,17 +1651,60 @@
             if (!rxPeelingDecoder || rxTotalK !== K) {
                 rxTotalK = K; rxBytes = totalBytes; rxSha = sha; rxMime = mime; rxName = name;
                 rxPeelingDecoder = new PeelingDecoder(K);
+                rxStartTime = Date.now();
+                rxTotalBytesTransferred = 0;
+                
                 progressBox.classList.remove('hidden');
+                if (fileInfoBadge) {
+                    const formattedSize = (rxBytes / 1024 / 1024 >= 1) ? (rxBytes / 1024 / 1024).toFixed(2) + ' MB' : Math.round(rxBytes / 1024) + ' KB';
+                    fileInfoBadge.innerText = `${rxName} (${formattedSize} • ${rxMime})`;
+                }
+                createMatrixGrid(K);
             }
 
             const chunkBytes = decodeBase45(dataStr);
             const res = rxPeelingDecoder.addDrop(indices, chunkBytes);
 
-            const pct = Math.round((rxPeelingDecoder.resolved.size / rxTotalK) * 100);
+            for (let i = 0; i < rxTotalK; i++) {
+                const box = document.getElementById(`chunk-box-${i}`);
+                if (box && rxPeelingDecoder.resolved.has(i)) {
+                    box.className = 'w-2 h-2 rounded-sm bg-emerald-500 shadow-[0_0_6px_#10b981] transition-all';
+                }
+            }
+
+            const resolvedCount = rxPeelingDecoder.resolved.size;
+            const pct = Math.round((resolvedCount / rxTotalK) * 100);
             progressBarFill.style.width = `${pct}%`;
             progressPercent.innerText = `${pct}%`;
 
-            if (res.complete) {
+            if (chunkCountText) {
+                chunkCountText.innerText = `${resolvedCount}/${rxTotalK} Drops`;
+            }
+
+            // Live Receiver Speed & ETA Calculation
+            const elapsedSec = (Date.now() - rxStartTime) / 1000;
+            if (elapsedSec > 0) {
+                rxTotalBytesTransferred = Math.round((resolvedCount / rxTotalK) * rxBytes);
+                const bytesPerSec = rxTotalBytesTransferred / elapsedSec;
+                const kbPerSec = bytesPerSec / 1024;
+                const mbPerSec = kbPerSec / 1024;
+
+                if (rxSpeedText) {
+                    rxSpeedText.innerText = mbPerSec >= 1 ? `${mbPerSec.toFixed(1)} MB/s` : `${Math.round(kbPerSec)} KB/s`;
+                }
+
+                const remainingBytes = Math.max(0, rxBytes - rxTotalBytesTransferred);
+                const remainingSec = bytesPerSec > 0 ? Math.ceil(remainingBytes / bytesPerSec) : 0;
+                if (rxEtaText) {
+                    rxEtaText.innerText = `ETA: ~${remainingSec}s`;
+                }
+            }
+
+            if (res.newlyResolved > 0) {
+                SoundFX.playChirp();
+            }
+
+            if (res.complete || resolvedCount === rxTotalK) {
                 stopCameraScanner();
                 reconstructDecimenPayload();
             }
