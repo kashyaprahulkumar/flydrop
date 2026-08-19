@@ -160,13 +160,8 @@
             object-fit: contain;
         }
 
-        .qr-grid-2 .qr-canvas-responsive {
-            max-height: min(var(--qr-max-size, 320px), 38vh);
-        }
-
-        .qr-grid-4 .qr-canvas-responsive {
-            max-height: min(var(--qr-max-size, 220px), 28vh);
-        }
+        .qr-grid-2 .qr-canvas-responsive { max-height: min(var(--qr-max-size, 320px), 38vh); }
+        .qr-grid-4 .qr-canvas-responsive { max-height: min(var(--qr-max-size, 220px), 28vh); }
 
         .qr-focus-overlay {
             position: fixed !important;
@@ -373,7 +368,7 @@
 
                     <!-- START BUTTON -->
                     <button id="startStreamBtn" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5">
-                        <span>🚀</span> <span>START TRANSFER</span>
+                        <span>🚀</span> <span id="startStreamBtnLabel">START TRANSFER</span>
                     </button>
                 </div>
 
@@ -976,6 +971,7 @@
 
         let rxStartTime = 0;
         let rxTotalBytesTransferred = 0;
+        let rxFileMap = new Map();
 
         let displayName = localStorage.getItem('flydrop_display_name') || 'Peer ' + Math.floor(1000 + Math.random() * 9000);
 
@@ -1064,33 +1060,42 @@
             if (customModal) customModal.classList.remove('hidden');
         }
 
-        function initReceiverIdentity() {
+        function getStablePin() {
             if (!myReceiverPin) {
                 myReceiverPin = Math.floor(100000 + Math.random() * 900000).toString();
             }
+            return myReceiverPin;
+        }
+
+        function initReceiverIdentity() {
+            const pin = getStablePin();
             const receiverPinDisplayCode = document.getElementById('receiverPinDisplayCode');
             if (receiverPinDisplayCode) {
-                receiverPinDisplayCode.innerText = `${myReceiverPin.substring(0,3)} ${myReceiverPin.substring(3,6)}`;
+                receiverPinDisplayCode.innerText = `${pin.substring(0,3)} ${pin.substring(3,6)}`;
             }
             const receiverPairingQrCanvas = document.getElementById('receiverPairingQrCanvas');
             if (receiverPairingQrCanvas) {
-                PureQREngine.render(receiverPairingQrCanvas, `P2P:sonic-${myReceiverPin}`, 'M');
+                PureQREngine.render(receiverPairingQrCanvas, `P2P:sonic-${pin}`, 'M');
             }
             if (!peer || peer.destroyed) {
-                peer = createSafePeer(`sonic-${myReceiverPin}`);
+                peer = createSafePeer(`sonic-${pin}`);
                 if (peer) {
                     peer.on('open', (id) => {
                         const userPeerIdText = document.getElementById('userPeerIdText');
-                        if (userPeerIdText) userPeerIdText.innerText = `ID: fly#${myReceiverPin}`;
+                        if (userPeerIdText) userPeerIdText.innerText = `ID: fly#${pin}`;
                         if (localHashedIp) startPresencePings(localHashedIp, id, 'receiver');
                     });
                     peer.on('connection', (conn) => {
                         peerConn = conn;
                         setupDataChannel(conn);
                         showActiveConnectionBadge('Connected Device', conn.peer);
+                        syncProtocolUI();
                         SoundFX.playSuccess();
                     });
                 }
+            } else {
+                const userPeerIdText = document.getElementById('userPeerIdText');
+                if (userPeerIdText) userPeerIdText.innerText = `ID: fly#${pin}`;
             }
         }
 
@@ -1118,6 +1123,7 @@
             }, 100);
         }
 
+        // DOM Element Bindings
         const globalBackBtn = document.getElementById('globalBackBtn');
         const openSettingsBtn = document.getElementById('openSettingsBtn');
         const showMyQrBtn = document.getElementById('showMyQrBtn');
@@ -1158,6 +1164,7 @@
         const stopStreamBtn = document.getElementById('stopStreamBtn');
         const manualPinCodeText = document.getElementById('manualPinCodeText');
         const startStreamBtn = document.getElementById('startStreamBtn');
+        const startStreamBtnLabel = document.getElementById('startStreamBtnLabel');
 
         const receiverSection = document.getElementById('receiverSection');
         const wifiReceiverContainer = document.getElementById('wifiReceiverContainer');
@@ -1296,6 +1303,7 @@
                     showNotice("File Exceeds 15MB Limit", "Selected file is larger than 15 MB. QR Stream is restricted to files up to 15 MB.");
                 }
                 renderFileList();
+                if (startStreamBtnLabel) startStreamBtnLabel.innerText = "START OPTICAL STREAM";
             } else {
                 openSettingsBtn.classList.add('hidden');
                 if (openSettingsFromCardBtn) openSettingsFromCardBtn.classList.add('hidden');
@@ -1305,6 +1313,16 @@
                 fileInput.setAttribute('multiple', 'multiple');
                 renderFileList();
                 initDiscovery();
+
+                if (peerConn && peerConn.open) {
+                    if (startStreamBtnLabel) startStreamBtnLabel.innerText = "SEND TO CONNECTED DEVICE";
+                    startStreamBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
+                    startStreamBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                } else {
+                    if (startStreamBtnLabel) startStreamBtnLabel.innerText = "START WIFI BROADCAST";
+                    startStreamBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                    startStreamBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+                }
             }
         }
 
@@ -1513,9 +1531,143 @@
                 renderFountainFrame();
                 streamInterval = setInterval(renderFountainFrame, frameDelay);
             } else {
-                startWifiPairingBroadcasting();
+                // WiFi Direct Mode
+                if (peerConn && peerConn.open) {
+                    await startWifiFileTransfer();
+                } else {
+                    startWifiPairingBroadcasting();
+                }
             }
         };
+
+        async function startWifiFileTransfer() {
+            if (!peerConn || !peerConn.open) {
+                showNotice("Not Connected", "Please connect to a receiver first or scan the receiver's pairing QR code.");
+                return;
+            }
+
+            if (activeTab === 'text') {
+                const val = textInputArea.value.trim();
+                if (!val) { showNotice("No Text Provided", "Please enter text to send."); return; }
+                peerConn.send({ type: 'TEXT', text: val });
+                SoundFX.playSuccess();
+                showNotice("Data Sent", "Text message transmitted successfully to paired device.");
+            } else {
+                if (selectedFiles.length === 0) {
+                    showNotice("No File Selected", "Please select file(s) to send.");
+                    return;
+                }
+
+                for (const file of selectedFiles) {
+                    await sendFileChunkedP2P(file);
+                }
+                showNotice("Transfer Complete", `${selectedFiles.length} file(s) sent successfully!`);
+            }
+        }
+
+        function startWifiPairingBroadcasting() {
+            const pin = getStablePin();
+            const pinBox = document.getElementById('numericPinDisplayBox');
+            if (pinBox) pinBox.classList.remove('hidden');
+
+            if (manualPinCodeText) {
+                manualPinCodeText.innerText = `${pin.substring(0,3)} ${pin.substring(3,6)}`;
+            }
+
+            if (!peer || peer.destroyed) {
+                peer = createSafePeer(`sonic-${pin}`);
+                if (peer) {
+                    peer.on('open', (id) => {
+                        if (userPeerIdText) userPeerIdText.innerText = `ID: fly#${pin}`;
+                        const payload = `P2P:${id}`;
+                        const canvasElem = document.getElementById('qrCanvasGrid_0');
+                        if (canvasElem) PureQREngine.render(canvasElem, payload, 'M');
+                        if (localHashedIp) startPresencePings(localHashedIp, id, 'sender');
+                    });
+                    peer.on('connection', (conn) => {
+                        peerConn = conn;
+                        setupDataChannel(conn);
+                        showActiveConnectionBadge('Connected Device', conn.peer);
+                        syncProtocolUI();
+                        SoundFX.playSuccess();
+
+                        qrCard.classList.add('hidden');
+                        senderControls.classList.remove('hidden');
+
+                        if (selectedFiles.length > 0 || (activeTab === 'text' && textInputArea.value.trim())) {
+                            startWifiFileTransfer();
+                        }
+                    });
+                }
+            } else {
+                if (userPeerIdText) userPeerIdText.innerText = `ID: fly#${pin}`;
+                const payload = `P2P:${peer.id}`;
+                const canvasElem = document.getElementById('qrCanvasGrid_0');
+                if (canvasElem) PureQREngine.render(canvasElem, payload, 'M');
+                if (localHashedIp) publishPresence(localHashedIp, peer.id, 'sender');
+            }
+
+            senderControls.classList.add('hidden');
+            qrCard.classList.remove('hidden');
+        }
+
+        // Chunked WebRTC Sender for reliable WiFi Direct transmission
+        async function sendFileChunkedP2P(file) {
+            if (!peerConn || !peerConn.open) return;
+
+            const fileId = Math.random().toString(36).substring(2, 9);
+            const chunkSize = 32 * 1024; // 32KB chunks for optimal RTCDataChannel throughput
+            const totalBytes = file.size;
+            const totalChunks = Math.ceil(totalBytes / chunkSize);
+            const mime = file.type || 'application/octet-stream';
+
+            peerConn.send({
+                type: 'FILE_START',
+                id: fileId,
+                name: file.name,
+                mime: mime,
+                totalBytes: totalBytes,
+                totalChunks: totalChunks
+            });
+
+            const arrayBuf = await file.arrayBuffer();
+            const uint8View = new Uint8Array(arrayBuf);
+            let chunkIdx = 0;
+
+            return new Promise((resolve) => {
+                function sendChunks() {
+                    while (chunkIdx < totalChunks) {
+                        if (peerConn.dataChannel && peerConn.dataChannel.bufferedAmount > 256 * 1024) {
+                            setTimeout(sendChunks, 25);
+                            return;
+                        }
+
+                        const start = chunkIdx * chunkSize;
+                        const end = Math.min(start + chunkSize, totalBytes);
+                        const slice = uint8View.subarray(start, end);
+
+                        peerConn.send({
+                            type: 'FILE_CHUNK',
+                            id: fileId,
+                            chunkIdx: chunkIdx,
+                            buffer: slice.buffer
+                        });
+
+                        chunkIdx++;
+                    }
+
+                    peerConn.send({
+                        type: 'FILE_END',
+                        id: fileId
+                    });
+
+                    SoundFX.playSuccess();
+                    resolve();
+                }
+
+                sendChunks();
+            });
+        }
 
         function startWifiPairingBroadcasting() {
             const pinBox = document.getElementById('numericPinDisplayBox');
@@ -1547,7 +1699,51 @@
                     receivedTextBox.classList.remove('hidden');
                     receivedBox.classList.remove('hidden');
                     SoundFX.playSuccess();
-                } else if (data.type === 'FILE') {
+                } else if (data.type === 'FILE_START') {
+                    rxFileMap.set(data.id, {
+                        name: data.name,
+                        mime: data.mime,
+                        totalBytes: data.totalBytes,
+                        totalChunks: data.totalChunks,
+                        chunks: new Array(data.totalChunks),
+                        receivedChunks: 0,
+                        receivedBytes: 0,
+                        startTime: Date.now()
+                    });
+                    progressBox.classList.remove('hidden');
+                    if (fileInfoBadge) fileInfoBadge.innerText = `${data.name} (${Math.round(data.totalBytes/1024)} KB)`;
+                    if (progressTitle) progressTitle.innerText = `Receiving ${data.name}...`;
+                } else if (data.type === 'FILE_CHUNK') {
+                    const item = rxFileMap.get(data.id);
+                    if (item) {
+                        const chunkData = new Uint8Array(data.buffer);
+                        item.chunks[data.chunkIdx] = chunkData;
+                        item.receivedChunks++;
+                        item.receivedBytes += chunkData.byteLength;
+
+                        const pct = Math.round((item.receivedBytes / item.totalBytes) * 100);
+                        progressBarFill.style.width = `${pct}%`;
+                        progressPercent.innerText = `${pct}%`;
+                        if (chunkCountText) chunkCountText.innerText = `${item.receivedChunks}/${item.totalChunks} Chunks`;
+
+                        const elapsed = (Date.now() - item.startTime) / 1000;
+                        if (elapsed > 0) {
+                            const bytesPerSec = item.receivedBytes / elapsed;
+                            const kbSec = bytesPerSec / 1024;
+                            if (rxSpeedText) rxSpeedText.innerText = `${Math.round(kbSec)} KB/s`;
+                        }
+                    }
+                } else if (data.type === 'FILE_END') {
+                    const item = rxFileMap.get(data.id);
+                    if (item) {
+                        const blob = new Blob(item.chunks, { type: item.mime || 'application/octet-stream' });
+                        addReceivedFileCard(blob, item.name);
+                        rxFileMap.delete(data.id);
+                        progressBox.classList.add('hidden');
+                        receivedBox.classList.remove('hidden');
+                        SoundFX.playSuccess();
+                    }
+                } else if (data.type === 'FILE') { // Legacy fallback
                     const blob = new Blob([data.buffer], { type: data.mime || 'application/octet-stream' });
                     addReceivedFileCard(blob, data.name);
                     receivedBox.classList.remove('hidden');
@@ -1570,6 +1766,7 @@
                 peerConn = conn;
                 setupDataChannel(conn);
                 showActiveConnectionBadge('Connected Device', targetId);
+                syncProtocolUI();
                 SoundFX.playSuccess();
             });
         }
@@ -1584,10 +1781,18 @@
             connPeerIdText.innerText = `fly#${peerId.replace('sonic-', '')}`;
         }
 
+        function handleConnectionClose() {
+            if (peerConn) {
+                try { peerConn.close(); } catch(e) {}
+                peerConn = null;
+            }
+            activeConnectionCard.classList.add('hidden');
+            syncProtocolUI();
+        }
+
         disconnectPeerBtn.onclick = () => {
             SoundFX.playClick();
-            if (peerConn) peerConn.close();
-            activeConnectionCard.classList.add('hidden');
+            handleConnectionClose();
         };
 
         startScanBtn.onclick = () => { SoundFX.playClick(); openCameraScanner(); };
@@ -1637,16 +1842,33 @@
             }
         }
 
+        function parseQrfPayload(str) {
+            let colons = 0;
+            let idxs = [];
+            for (let i = 0; i < str.length && colons < 7; i++) {
+                if (str[i] === ':') {
+                    idxs.push(i);
+                    colons++;
+                }
+            }
+            if (colons < 7) return null;
+            const tag = str.substring(0, idxs[0]);
+            if (tag !== 'QRF') return null;
+            const K = parseInt(str.substring(idxs[0]+1, idxs[1]));
+            const totalBytes = parseInt(str.substring(idxs[1]+1, idxs[2]));
+            const sha = str.substring(idxs[2]+1, idxs[3]);
+            const indices = str.substring(idxs[3]+1, idxs[4]).split('+').map(n => parseInt(n));
+            const mime = str.substring(idxs[4]+1, idxs[5]);
+            const name = decodeURIComponent(str.substring(idxs[5]+1, idxs[6]));
+            const dataStr = str.substring(idxs[6]+1);
+            return { K, totalBytes, sha, indices, mime, name, dataStr };
+        }
+
         function processDecimenOpticalFrame(rawText) {
-            const parts = rawText.split(':');
-            if (parts.length < 8) return;
-            const K = parseInt(parts[1]);
-            const totalBytes = parseInt(parts[2]);
-            const sha = parts[3];
-            const indices = parts[4].split('+').map(n => parseInt(n));
-            const mime = parts[5];
-            const name = decodeURIComponent(parts[6]);
-            const dataStr = parts.slice(7).join(':');
+            const parsed = parseQrfPayload(rawText);
+            if (!parsed) return;
+
+            const { K, totalBytes, sha, indices, mime, name, dataStr } = parsed;
 
             if (!rxPeelingDecoder || rxTotalK !== K) {
                 rxTotalK = K; rxBytes = totalBytes; rxSha = sha; rxMime = mime; rxName = name;
@@ -1681,7 +1903,6 @@
                 chunkCountText.innerText = `${resolvedCount}/${rxTotalK} Drops`;
             }
 
-            // Live Receiver Speed & ETA Calculation
             const elapsedSec = (Date.now() - rxStartTime) / 1000;
             if (elapsedSec > 0) {
                 rxTotalBytesTransferred = Math.round((resolvedCount / rxTotalK) * rxBytes);
@@ -1735,8 +1956,8 @@
         function addReceivedFileCard(blob, name) {
             const url = URL.createObjectURL(blob);
             const div = document.createElement('div');
-            div.className = "p-2 bg-white rounded-xl border border-emerald-200 flex items-center justify-between text-xs";
-            div.innerHTML = `<span class="font-bold text-slate-800 truncate max-w-[150px]">${name}</span><a href="${url}" download="${name}" class="px-2.5 py-1 bg-emerald-500 text-white font-bold text-[10px] rounded-lg uppercase">Save</a>`;
+            div.className = "p-2 bg-white rounded-xl border border-emerald-200 flex items-center justify-between text-xs shadow-sm";
+            div.innerHTML = `<span class="font-bold text-slate-800 truncate max-w-[150px]">${name}</span><a href="${url}" download="${name}" class="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] rounded-lg uppercase">Save</a>`;
             receivedBatchList.appendChild(div);
         }
 
