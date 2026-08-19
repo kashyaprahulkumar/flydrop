@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SonicDrop - Direct WebRTC & QR Transfer</title>
+    <title>SonicDrop Turbo - LT Fountain QR & WebRTC Transfer</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -187,6 +187,10 @@
         }
         @keyframes scanLaser { 0% { top: 10%; } 100% { top: 90%; } }
 
+        .qr-grid-1 { display: grid; grid-template-columns: 1fr; gap: 8px; justify-items: center; align-items: center; width: 100%; }
+        .qr-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; justify-items: center; align-items: center; width: 100%; }
+        .qr-grid-4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; justify-items: center; align-items: center; width: 100%; }
+
         .qr-canvas-responsive {
             width: 100%;
             height: auto;
@@ -195,6 +199,22 @@
             aspect-ratio: 1 / 1;
             object-fit: contain;
         }
+
+        .qr-focus-overlay {
+            position: fixed !important;
+            inset: 0 !important;
+            z-index: 999 !important;
+            background: #ffffff !important;
+            padding: 1.5rem !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
+        }
+        .dark .qr-focus-overlay { background: #0f172a !important; }
 
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -209,6 +229,7 @@
 </head>
 <body>
 
+    <!-- MAIN WRAPPER CONTAINER -->
     <div class="w-full max-w-sm md:max-w-xl lg:max-w-2xl mx-auto flex flex-col h-full max-h-[92vh] md:max-h-[88vh] relative justify-between transition-all duration-300">
         
         <!-- TOP HEADER LOGO & PROFILE BAR -->
@@ -223,7 +244,10 @@
             </div>
             
             <div class="flex items-center gap-1.5">
-                <button id="toggleDarkModeBtn" title="Toggle Theme" class="w-8 h-8 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs flex items-center justify-center transition-all shadow-sm">
+                <button id="openSettingsBtn" title="LT Fountain & Optical Settings" class="hidden px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-300 font-extrabold text-[10px] flex items-center gap-1 transition-all shadow-sm active:scale-95">
+                    ⚙️ Settings
+                </button>
+                <button id="toggleDarkModeBtn" title="Toggle Dark Theme" class="w-8 h-8 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs flex items-center justify-center transition-all shadow-sm">
                     🌙
                 </button>
                 <button id="showMyQrBtn" title="Show Pairing Code" class="w-8 h-8 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-indigo-500 text-xs flex items-center justify-center transition-all shadow-sm">
@@ -235,7 +259,7 @@
             </div>
         </div>
 
-        <!-- MAIN CARD -->
+        <!-- MAIN CARD CONTAINER -->
         <div class="w-full app-hud-card p-4 relative overflow-y-auto overflow-x-hidden flex-1 flex flex-col justify-between">
             
             <!-- USER PROFILE BADGE -->
@@ -247,10 +271,10 @@
                     </div>
                     <div class="text-left">
                         <div class="text-xs font-black text-slate-800 dark:text-slate-200 flex items-center gap-1">
-                            <span id="userNameText">User</span>
-                            <button id="editNameBtn" class="text-slate-400 hover:text-indigo-500 text-[10px]" title="Edit Name">✏️</button>
+                            <span id="userNameText">Peer</span>
+                            <button id="editNameBtn" class="text-slate-400 hover:text-indigo-500 text-[10px]" title="Edit Display Name">✏️</button>
                         </div>
-                        <div id="userPeerIdText" class="text-[9px] font-bold text-slate-400 uppercase tracking-wide">ID: Initializing...</div>
+                        <div id="userPeerIdText" class="text-[9px] font-bold text-slate-400 uppercase tracking-wide">ID: Ready</div>
                     </div>
                 </div>
                 <div id="headerStatusBadge" class="text-[9px] font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950 dark:text-indigo-300 px-2 py-0.5 rounded-md uppercase">
@@ -297,7 +321,7 @@
                 </div>
 
                 <div class="text-[10px] text-slate-400 dark:text-slate-500 font-medium text-center max-w-[220px]">
-                    Direct P2P WebRTC Direct Transfer or Animated QR Transport.
+                    High-Speed P2P WebRTC Direct Transfer or Air-Gapped LT Fountain QR Transport.
                 </div>
             </div>
 
@@ -310,7 +334,7 @@
                         <span>📶</span> WiFi Direct
                     </button>
                     <button id="btnModeQr" class="segment-tab-btn py-1.5 flex items-center justify-center gap-1 text-slate-500 dark:text-slate-400">
-                        <span>⚡</span> QR Stream
+                        <span>⚡</span> QR Stream (Fountain)
                     </button>
                 </div>
 
@@ -335,7 +359,7 @@
                                     📁
                                 </div>
                                 <div class="text-xs font-black text-slate-800 dark:text-slate-200">Choose Files or Drag & Drop</div>
-                                <div id="fileNameText" class="text-[10px] text-slate-400">Photos, Video, Audio, Docs</div>
+                                <div id="fileNameText" class="text-[10px] text-slate-400">Photos, Video, Audio, Docs (Up to 10MB)</div>
                             </div>
                             <div id="fileListContainer" class="hidden w-full space-y-1.5 max-h-28 overflow-y-auto mt-2 text-left"></div>
                             <input type="file" id="fileInput" multiple class="hidden" accept="*/*">
@@ -350,8 +374,10 @@
                     <!-- BROADCASTING STREAM DISPLAY CARD -->
                     <div id="qrCard" class="hidden inner-card p-2 text-center space-y-2 border-none bg-transparent flex-1 flex flex-col justify-between">
                         <div class="flex items-center justify-between pb-1 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
-                            <span id="broadcastingHeaderTitle" class="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase">Broadcasting Stream</span>
+                            <span id="broadcastingHeaderTitle" class="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase">Broadcasting LT Fountain Stream</span>
                             <div class="flex items-center gap-1.5">
+                                <button id="openSettingsFromCardBtn" class="hidden px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-300 text-[9px] font-extrabold rounded-lg">⚙️ Config</button>
+                                <button id="toggleQrEnlargeBtn" class="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 text-[9px] font-extrabold rounded-lg border border-indigo-200 dark:border-indigo-800">🖥️ Boundary-less View</button>
                                 <button id="stopStreamBtn" class="text-rose-600 dark:text-rose-400 text-[10px] font-bold">✕ Close</button>
                             </div>
                         </div>
@@ -362,7 +388,9 @@
                         </div>
 
                         <div id="singleCanvasBox" class="flex justify-center my-auto transition-all duration-300 w-full overflow-hidden items-center p-1 flex-1">
-                            <canvas id="qrCanvasGrid_0" width="320" height="320" class="rounded-xl bg-white p-2 border border-slate-200 dark:border-slate-700 qr-canvas-responsive shadow-sm mx-auto object-contain"></canvas>
+                            <div id="multiQrGridContainer" class="qr-grid-1 mx-auto w-full flex justify-center items-center">
+                                <canvas id="qrCanvasGrid_0" width="360" height="380" class="rounded-xl bg-white p-2 border border-slate-200 dark:border-slate-700 qr-canvas-responsive shadow-sm mx-auto object-contain"></canvas>
+                            </div>
                         </div>
                         <div id="frameInfoText" class="text-[9px] font-extrabold text-slate-400 mono-font flex-shrink-0">Turn up brightness for camera scanning</div>
                     </div>
@@ -419,12 +447,12 @@
                         <!-- HEADER WITH FILE META -->
                         <div class="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-slate-700 text-left">
                             <div>
-                                <div id="progressTitle" class="text-[11px] font-black text-slate-800 dark:text-slate-100 truncate max-w-[180px]">Transferring Payload...</div>
-                                <div id="fileInfoBadge" class="text-[9px] font-bold text-indigo-600 dark:text-indigo-400 mono-font">Initialising...</div>
+                                <div id="progressTitle" class="text-[11px] font-black text-slate-800 dark:text-slate-100 truncate max-w-[180px]">Reconstructing Stream...</div>
+                                <div id="fileInfoBadge" class="text-[9px] font-bold text-indigo-600 dark:text-indigo-400 mono-font">Reading LT Drops...</div>
                             </div>
                             <div class="text-right">
                                 <div id="progressPercent" class="text-xl font-black text-indigo-600 dark:text-indigo-400">0%</div>
-                                <div id="chunkCountText" class="text-[8px] font-extrabold text-slate-400 mono-font">0/0 Chunks</div>
+                                <div id="chunkCountText" class="text-[8px] font-extrabold text-slate-400 mono-font">0/0 Drops</div>
                             </div>
                         </div>
 
@@ -439,12 +467,15 @@
                             <span id="rxEtaText" class="mono-font">ETA: --s</span>
                         </div>
 
+                        <!-- CHUNK MATRIX VISUALIZATION -->
+                        <div id="chunkMatrix" class="flex flex-wrap gap-1 max-h-16 overflow-y-auto p-1.5 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800"></div>
+
                         <button id="cancelReceiveBtn" class="w-full py-1.5 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-lg transition-colors">✕ Cancel Transfer</button>
                     </div>
 
                     <!-- RECONSTRUCTED OUTPUT -->
                     <div id="receivedBox" class="hidden text-center bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3 space-y-2">
-                        <div class="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">🎉 Payload Received & Verified!</div>
+                        <div id="receivedIntegrityStatus" class="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">✓ Integrity Verified (SHA-256)</div>
                         <div id="receivedBatchList" class="space-y-1.5 max-h-36 overflow-y-auto text-left"></div>
                         <div id="receivedTextBox" class="hidden text-left space-y-1">
                             <textarea id="scannedTextContent" readonly rows="3" class="w-full bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2 text-xs mono-font resize-none text-slate-800 dark:text-slate-100"></textarea>
@@ -458,6 +489,67 @@
         </div>
     </div>
 
+    <!-- SETTINGS MODAL -->
+    <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl max-w-xs w-full p-4 space-y-3 text-left shadow-xl">
+            <div class="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-700">
+                <span class="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase">⚙️ LT Fountain Engine Settings</span>
+                <button id="closeSettingsModalBtn" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold">✕</button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-[10px]">
+                <div>
+                    <label class="block font-bold text-slate-500 dark:text-slate-400 mb-1">FPS Speed</label>
+                    <select id="txFpsSelect" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 font-bold text-indigo-600 dark:text-indigo-400 outline-none">
+                        <option value="10">10 FPS</option>
+                        <option value="15" selected>15 FPS</option>
+                        <option value="24">24 FPS</option>
+                        <option value="30">30 FPS</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-500 dark:text-slate-400 mb-1">Block Density</label>
+                    <select id="bytesPerFrameSelect" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 font-bold text-indigo-600 dark:text-indigo-400 outline-none">
+                        <option value="250">250 Bytes (High Contrast)</option>
+                        <option value="500">500 Bytes (Safe)</option>
+                        <option value="1000" selected>1000 Bytes (Balanced)</option>
+                        <option value="1465">1465 Bytes (Max Speed)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-[10px]">
+                <div>
+                    <label class="block font-bold text-slate-500 dark:text-slate-400 mb-1">Error Correction</label>
+                    <select id="qrEcSelect" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 font-bold text-indigo-600 dark:text-indigo-400 outline-none">
+                        <option value="L" selected>L (Low - Max Speed)</option>
+                        <option value="M">M (Medium)</option>
+                        <option value="Q">Q (Quartile)</option>
+                        <option value="H">H (High Security)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-500 dark:text-slate-400 mb-1">Multi-Code Grid</label>
+                    <select id="qrLayoutSelect" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 font-bold text-indigo-600 dark:text-indigo-400 outline-none">
+                        <option value="1" selected>1 Code (Single)</option>
+                        <option value="2">2 Codes (1×2 Grid)</option>
+                        <option value="4">4 Codes (2×2 Grid)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="text-[10px] space-y-1">
+                <div class="flex justify-between font-bold text-slate-500 dark:text-slate-400">
+                    <span>🖥️ QR Display Size</span>
+                    <span id="qrScaleValText" class="text-indigo-600 dark:text-indigo-400 mono-font">320px</span>
+                </div>
+                <input type="range" id="qrScaleRangeInput" min="200" max="600" value="320" step="20" class="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+            </div>
+
+            <button id="saveSettingsBtn" class="w-full py-2 bg-indigo-600 text-white font-black text-xs uppercase rounded-xl">Save & Apply</button>
+        </div>
+    </div>
+
     <!-- CUSTOM NOTICE MODAL -->
     <div id="customModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl max-w-xs w-full p-4 text-center shadow-xl space-y-2">
@@ -467,10 +559,9 @@
         </div>
     </div>
 
-    <!-- JavaScript Application Logic -->
+    <!-- JSDOC LOGIC AND WORKER ENGINE -->
     <script>
         /**
-         * STREAMING_CHUNK:Initializing SoundFX Web Audio synthesizer...
          * SoundFX Module - Synthesizes Web Audio chimes without external audio URLs
          */
         const SoundFX = (function() {
@@ -570,8 +661,7 @@
         })();
 
         /**
-         * STREAMING_CHUNK:Defining CRC32 and SHA-256 Crypto Utilities...
-         * CRC32 Helper for QR Stream verification
+         * CRC32 Error Detection Algorithm
          */
         function crc32(str) {
             let crc = -1;
@@ -584,6 +674,9 @@
             return ((crc ^ (-1)) >>> 0).toString(16).toUpperCase().padStart(8, '0');
         }
 
+        /**
+         * SHA-256 Digest Verification
+         */
         async function computeSha256Hex(arrayBuffer) {
             try {
                 const hashBuf = await crypto.subtle.digest('SHA-256', arrayBuffer);
@@ -612,8 +705,229 @@
             return bytes;
         }
 
+        function xorUint8Arrays(a, b) {
+            const maxLen = Math.max(a.length, b.length);
+            const res = new Uint8Array(maxLen);
+            res.set(a);
+            for (let i = 0; i < b.length; i++) {
+                res[i] ^= b[i];
+            }
+            return res;
+        }
+
         /**
-         * STREAMING_CHUNK:Initializing application state variables...
+         * Mulberry32 Deterministic PRNG Generator
+         */
+        function createPrng(seed) {
+            let s = seed >>> 0;
+            return function() {
+                s = (s + 0x6D2B79F5) >>> 0;
+                let t = Math.imul(s ^ (s >>> 15), 1 | s);
+                t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+        }
+
+        /**
+         * Robust Soliton Degree Distribution Sampler for LT Fountain
+         */
+        function sampleSolitonDegree(prng, K) {
+            if (K <= 1) return 1;
+            const r = prng();
+            if (r < 0.25) return 1; // High degree-1 probability for immediate seed decoding
+            if (r < 0.65) return 2;
+            if (r < 0.85) return Math.min(3, K);
+            if (r < 0.95) return Math.min(5, K);
+            return Math.min(Math.floor(prng() * (K - 1)) + 1, K);
+        }
+
+        /**
+         * STREAMING_CHUNK:Constructing Web Worker for LT Fountain Peeling Decoder...
+         * Inline WebWorker source for off-thread Peeling LT Fountain Decoder
+         */
+        const workerScript = `
+            function crc32(str) {
+                let crc = -1;
+                for (let i = 0; i < str.length; i++) {
+                    crc ^= str.charCodeAt(i);
+                    for (let j = 0; j < 8; j++) {
+                        crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+                    }
+                }
+                return ((crc ^ (-1)) >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            }
+
+            function base64ToUint8Array(base64) {
+                const binary = atob(base64);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                return bytes;
+            }
+
+            function xorUint8Arrays(a, b) {
+                const maxLen = Math.max(a.length, b.length);
+                const res = new Uint8Array(maxLen);
+                res.set(a);
+                for (let i = 0; i < b.length; i++) {
+                    res[i] ^= b[i];
+                }
+                return res;
+            }
+
+            function createPrng(seed) {
+                let s = seed >>> 0;
+                return function() {
+                    s = (s + 0x6D2B79F5) >>> 0;
+                    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+                    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+                    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+                };
+            }
+
+            let sessionId = null;
+            let K = 0;
+            let fileSize = 0;
+            let blockSize = 0;
+            let fileHash = '';
+            let fileName = '';
+            let fileMime = '';
+            let resolvedBlocks = new Map();
+            let equations = [];
+            let processedSeqs = new Set();
+
+            self.onmessage = function(e) {
+                const msg = e.data;
+                if (msg.type === 'RESET') {
+                    sessionId = null;
+                    K = 0;
+                    resolvedBlocks.clear();
+                    equations = [];
+                    processedSeqs.clear();
+                    return;
+                }
+
+                if (msg.type === 'PARSE_FRAME') {
+                    let frameObj = null;
+                    try {
+                        frameObj = JSON.parse(msg.rawText);
+                    } catch(err) {
+                        return;
+                    }
+
+                    if (!frameObj || !frameObj.payload || !frameObj.crc) return;
+
+                    // CRC32 Check
+                    if (crc32(frameObj.payload) !== frameObj.crc) return;
+
+                    if (!sessionId || sessionId !== frameObj.sessionId) {
+                        sessionId = frameObj.sessionId;
+                        K = frameObj.blockCount;
+                        fileSize = frameObj.fileSize;
+                        blockSize = frameObj.blockSize;
+                        fileHash = frameObj.fileHash;
+                        fileName = frameObj.name || 'SonicDrop_File';
+                        fileMime = frameObj.mime || 'application/octet-stream';
+                        resolvedBlocks.clear();
+                        equations = [];
+                        processedSeqs.clear();
+                    }
+
+                    if (processedSeqs.has(frameObj.seq)) return;
+                    processedSeqs.add(frameObj.seq);
+
+                    const payloadBytes = base64ToUint8Array(frameObj.payload);
+                    const prng = createPrng(frameObj.seed);
+                    const degree = frameObj.degree;
+
+                    const idxSet = new Set();
+                    while (idxSet.size < degree) {
+                        idxSet.add(Math.floor(prng() * K));
+                    }
+                    const indices = Array.from(idxSet);
+
+                    // Peeling LT insertion
+                    let remIndices = new Set(indices);
+                    let curData = new Uint8Array(payloadBytes);
+
+                    for (let idx of indices) {
+                        if (resolvedBlocks.has(idx)) {
+                            curData = xorUint8Arrays(curData, resolvedBlocks.get(idx));
+                            remIndices.delete(idx);
+                        }
+                    }
+
+                    if (remIndices.size > 0) {
+                        equations.push({ indices: remIndices, data: curData });
+                        peel();
+                    }
+
+                    const resolvedCount = resolvedBlocks.size;
+                    self.postMessage({
+                        type: 'PROGRESS',
+                        resolvedCount: resolvedCount,
+                        blockCount: K,
+                        fileSize: fileSize,
+                        fileName: fileName,
+                        fileMime: fileMime,
+                        fileHash: fileHash,
+                        collectedDrops: processedSeqs.size
+                    });
+
+                    if (resolvedCount === K) {
+                        let totalLen = 0;
+                        for (let i = 0; i < K; i++) totalLen += resolvedBlocks.get(i).length;
+                        const reassembled = new Uint8Array(Math.min(totalLen, fileSize));
+                        let offset = 0;
+                        for (let i = 0; i < K; i++) {
+                            const chunk = resolvedBlocks.get(i);
+                            const sliceLen = Math.min(chunk.length, fileSize - offset);
+                            reassembled.set(chunk.subarray(0, sliceLen), offset);
+                            offset += sliceLen;
+                        }
+
+                        self.postMessage({
+                            type: 'COMPLETE',
+                            buffer: reassembled.buffer,
+                            fileName: fileName,
+                            fileMime: fileMime,
+                            fileHash: fileHash
+                        }, [reassembled.buffer]);
+                    }
+                }
+            };
+
+            function peel() {
+                let changed = true;
+                while (changed) {
+                    changed = false;
+                    for (let i = 0; i < equations.length; i++) {
+                        const eq = equations[i];
+                        if (eq.indices.size === 1) {
+                            const [resolvedIdx] = eq.indices;
+                            resolvedBlocks.set(resolvedIdx, eq.data);
+                            equations.splice(i, 1);
+                            changed = true;
+
+                            for (let otherEq of equations) {
+                                if (otherEq.indices.has(resolvedIdx)) {
+                                    otherEq.indices.delete(resolvedIdx);
+                                    otherEq.data = xorUint8Arrays(otherEq.data, eq.data);
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        `;
+
+        const workerBlob = new Blob([workerScript], { type: 'application/javascript' });
+        const decoderWorker = new Worker(URL.createObjectURL(workerBlob));
+
+        /**
+         * STREAMING_CHUNK:Initializing Application State Variables...
          */
         let currentStage = 1;
         let transferProtocol = 'p2p';
@@ -624,24 +938,39 @@
         let myReceiverPin = null;
         let qrScanner = null;
         let qrStreamInterval = null;
+        let wakeLock = null;
 
+        let ltSessionId = null;
+        let ltBlockCount = 0;
+        let ltBlockSize = 1000;
+        let ltSourceBlocks = [];
+        let ltFileHash = '';
+        let ltSeqCounter = 0;
+
+        let rxStartTime = 0;
         let rxFileMap = new Map();
-        let qrRxState = null;
-
         let displayName = localStorage.getItem('sonicdrop_display_name') || 'Peer ' + Math.floor(1000 + Math.random() * 9000);
 
         /**
-         * STREAMING_CHUNK:Defining UI helper and file icon utilities...
+         * Screen Wake Lock Handler
          */
-        function getFileIcon(name) {
-            const ext = (name || '').split('.').pop().toLowerCase();
-            if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext)) return '🖼️';
-            if (['mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac'].includes(ext)) return '🎵';
-            if (['mp4', 'webm', 'mov', 'mkv', 'avi'].includes(ext)) return '🎬';
-            if (['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'zip', 'rar'].includes(ext)) return '📄';
-            return '📁';
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch(e) {}
         }
 
+        function releaseWakeLock() {
+            if (wakeLock) {
+                wakeLock.release().then(() => { wakeLock = null; }).catch(() => {});
+            }
+        }
+
+        /**
+         * STREAMING_CHUNK:Configuring UI Navigation and Event Handlers...
+         */
         function showNotice(title, msg, isHtml = false) {
             const modalTitle = document.getElementById('modalTitle');
             const modalMsg = document.getElementById('modalMsg');
@@ -661,9 +990,6 @@
             return myReceiverPin;
         }
 
-        /**
-         * STREAMING_CHUNK:Rendering selected file list UI...
-         */
         function renderFileList() {
             const fileListContainer = document.getElementById('fileListContainer');
             const fileNameText = document.getElementById('fileNameText');
@@ -671,26 +997,23 @@
 
             if (selectedFiles.length === 0) {
                 fileListContainer.classList.add('hidden');
-                if (fileNameText) fileNameText.innerText = "Photos, Video, Audio, Docs";
+                if (fileNameText) fileNameText.innerText = "Photos, Video, Audio, Docs (Up to 10MB)";
                 return;
             }
 
             fileListContainer.classList.remove('hidden');
             fileListContainer.innerHTML = '';
 
-            if (fileNameText) {
-                fileNameText.innerText = `${selectedFiles.length} file(s) selected`;
-            }
+            if (fileNameText) fileNameText.innerText = `${selectedFiles.length} file(s) selected`;
 
             selectedFiles.forEach((file, idx) => {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = "flex items-center justify-between p-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs shadow-sm";
-                const icon = getFileIcon(file.name);
                 const kb = Math.round(file.size / 1024);
 
                 itemDiv.innerHTML = `
                     <div class="flex items-center gap-2 truncate pr-2">
-                        <span>${icon}</span>
+                        <span>📁</span>
                         <span class="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[140px]">${file.name}</span>
                         <span class="text-[9px] text-slate-400 mono-font">(${kb} KB)</span>
                     </div>
@@ -712,23 +1035,34 @@
 
         function handleFileSelection(filesArr) {
             if (!filesArr || filesArr.length === 0) return;
-            selectedFiles = filesArr;
+            if (transferProtocol === 'qr') {
+                if (filesArr.length > 1) {
+                    showNotice("Single File Mode", "QR Optical Stream handles 1 file per stream. Using first file.");
+                }
+                const f = filesArr[0];
+                if (f.size > 10 * 1024 * 1024) {
+                    showNotice("File Size Exceeded", "Optical QR Stream targets files up to 10MB. Please use WiFi Direct for larger files.");
+                    return;
+                }
+                selectedFiles = [f];
+            } else {
+                selectedFiles = filesArr;
+            }
             renderFileList();
         }
 
         /**
-         * STREAMING_CHUNK:Binding DOM element references...
+         * STREAMING_CHUNK:Binding DOM Controls and UI Event Listeners...
          */
         const globalBackBtn = document.getElementById('globalBackBtn');
+        const openSettingsBtn = document.getElementById('openSettingsBtn');
+        const toggleDarkModeBtn = document.getElementById('toggleDarkModeBtn');
         const showMyQrBtn = document.getElementById('showMyQrBtn');
         const toggleSoundBtn = document.getElementById('toggleSoundBtn');
-        const toggleDarkModeBtn = document.getElementById('toggleDarkModeBtn');
         const userNameText = document.getElementById('userNameText');
         const userAvatarText = document.getElementById('userAvatarText');
         const editNameBtn = document.getElementById('editNameBtn');
         const userPeerIdText = document.getElementById('userPeerIdText');
-        const connectionStatusDot = document.getElementById('connectionStatusDot');
-        const headerStatusBadge = document.getElementById('headerStatusBadge');
 
         const activeConnectionCard = document.getElementById('activeConnectionCard');
         const connPeerAvatarText = document.getElementById('connPeerAvatarText');
@@ -755,6 +1089,8 @@
         const textInputArea = document.getElementById('textInputArea');
 
         const qrCard = document.getElementById('qrCard');
+        const openSettingsFromCardBtn = document.getElementById('openSettingsFromCardBtn');
+        const toggleQrEnlargeBtn = document.getElementById('toggleQrEnlargeBtn');
         const stopStreamBtn = document.getElementById('stopStreamBtn');
         const manualPinCodeText = document.getElementById('manualPinCodeText');
         const startStreamBtn = document.getElementById('startStreamBtn');
@@ -785,52 +1121,48 @@
         const receivedTextBox = document.getElementById('receivedTextBox');
         const scannedTextContent = document.getElementById('scannedTextContent');
         const copyTextBtn = document.getElementById('copyTextBtn');
+
+        const settingsModal = document.getElementById('settingsModal');
+        const closeSettingsModalBtn = document.getElementById('closeSettingsModalBtn');
+        const txFpsSelect = document.getElementById('txFpsSelect');
+        const bytesPerFrameSelect = document.getElementById('bytesPerFrameSelect');
+        const qrEcSelect = document.getElementById('qrEcSelect');
+        const qrLayoutSelect = document.getElementById('qrLayoutSelect');
+        const qrScaleRangeInput = document.getElementById('qrScaleRangeInput');
+        const qrScaleValText = document.getElementById('qrScaleValText');
+        const saveSettingsBtn = document.getElementById('saveSettingsBtn');
         const modalCloseBtn = document.getElementById('modalCloseBtn');
 
         if (userNameText) userNameText.innerText = displayName;
         if (userAvatarText) userAvatarText.innerText = displayName[0].toUpperCase();
 
-        /**
-         * STREAMING_CHUNK:Configuring dark mode and sound FX toggles...
-         */
-        if (toggleDarkModeBtn) {
-            toggleDarkModeBtn.onclick = () => {
-                SoundFX.playClick();
-                document.body.classList.toggle('dark');
-            };
-        }
+        toggleDarkModeBtn.onclick = () => {
+            SoundFX.playClick();
+            document.body.classList.toggle('dark');
+        };
 
-        if (editNameBtn) {
-            editNameBtn.onclick = (e) => {
-                e.stopPropagation();
-                SoundFX.playClick();
-                const newName = prompt("Enter display name:", displayName);
-                if (newName && newName.trim()) {
-                    displayName = newName.trim();
-                    localStorage.setItem('sonicdrop_display_name', displayName);
-                    userNameText.innerText = displayName;
-                    userAvatarText.innerText = displayName[0].toUpperCase();
-                }
-            };
-        }
+        editNameBtn.onclick = (e) => {
+            e.stopPropagation();
+            SoundFX.playClick();
+            const newName = prompt("Enter display name:", displayName);
+            if (newName && newName.trim()) {
+                displayName = newName.trim();
+                localStorage.setItem('sonicdrop_display_name', displayName);
+                userNameText.innerText = displayName;
+                userAvatarText.innerText = displayName[0].toUpperCase();
+            }
+        };
 
-        if (showMyQrBtn) {
-            showMyQrBtn.onclick = () => {
-                SoundFX.playClick();
-                showPairingQrModal();
-            };
-        }
+        showMyQrBtn.onclick = () => {
+            SoundFX.playClick();
+            showPairingQrModal();
+        };
 
-        if (toggleSoundBtn) {
-            toggleSoundBtn.onclick = () => {
-                const state = SoundFX.toggle();
-                toggleSoundBtn.innerText = state ? '🔊' : '🔇';
-            };
-        }
+        toggleSoundBtn.onclick = () => {
+            const state = SoundFX.toggle();
+            toggleSoundBtn.innerText = state ? '🔊' : '🔇';
+        };
 
-        /**
-         * STREAMING_CHUNK:Handling stage navigation and transition events...
-         */
         function navigateToStage(stage, role = 'sender') {
             currentStage = stage;
             SoundFX.playClick();
@@ -839,6 +1171,7 @@
                 stage1_Home.classList.remove('hidden');
                 stage3_Hub.classList.add('hidden');
                 globalBackBtn.classList.add('hidden');
+                openSettingsBtn.classList.add('hidden');
             } else if (stage === 3) {
                 stage1_Home.classList.add('hidden');
                 stage3_Hub.classList.remove('hidden');
@@ -882,15 +1215,16 @@
 
         function syncProtocolUI() {
             if (transferProtocol === 'qr') {
+                openSettingsBtn.classList.remove('hidden');
+                if (openSettingsFromCardBtn) openSettingsFromCardBtn.classList.remove('hidden');
                 wifiReceiverContainer.classList.add('hidden');
-                if (startScanBtnLabel) startScanBtnLabel.innerText = "SCAN QR STREAM";
+                if (startScanBtnLabel) startScanBtnLabel.innerText = "SCAN FOUNTAIN QR STREAM";
                 fileInput.removeAttribute('multiple');
-                if (selectedFiles.length > 1) {
-                    selectedFiles = [selectedFiles[0]];
-                }
                 renderFileList();
-                if (startStreamBtnLabel) startStreamBtnLabel.innerText = "START QR STREAM";
+                if (startStreamBtnLabel) startStreamBtnLabel.innerText = "START FOUNTAIN STREAM";
             } else {
+                openSettingsBtn.classList.add('hidden');
+                if (openSettingsFromCardBtn) openSettingsFromCardBtn.classList.add('hidden');
                 wifiReceiverContainer.classList.remove('hidden');
                 if (startScanBtnLabel) startScanBtnLabel.innerText = "SCAN PAIRING QR CODE";
                 fileInput.setAttribute('multiple', 'multiple');
@@ -908,9 +1242,6 @@
             }
         }
 
-        /**
-         * STREAMING_CHUNK:Configuring Drag and Drop and File Input listeners...
-         */
         if (dropzone) {
             dropzone.onclick = () => { SoundFX.playClick(); fileInput.click(); };
             dropzone.ondragover = (e) => { e.preventDefault(); dropzone.classList.add('border-indigo-400'); };
@@ -958,22 +1289,313 @@
             };
         }
 
+        openSettingsBtn.onclick = () => { SoundFX.playClick(); settingsModal.classList.remove('hidden'); };
+        if (openSettingsFromCardBtn) openSettingsFromCardBtn.onclick = () => { SoundFX.playClick(); settingsModal.classList.remove('hidden'); };
+        closeSettingsModalBtn.onclick = saveSettingsBtn.onclick = () => { SoundFX.playClick(); settingsModal.classList.add('hidden'); };
+
+        qrScaleRangeInput.oninput = () => {
+            const size = qrScaleRangeInput.value;
+            qrScaleValText.innerText = `${size}px`;
+            const container = document.getElementById('multiQrGridContainer');
+            if (container) container.style.setProperty('--qr-max-size', `${size}px`);
+        };
+
         stopStreamBtn.onclick = () => {
             SoundFX.playClick();
             if (qrStreamInterval) { clearInterval(qrStreamInterval); qrStreamInterval = null; }
+            releaseWakeLock();
             qrCard.classList.add('hidden');
             senderControls.classList.remove('hidden');
         };
 
-        if (disconnectPeerBtn) {
-            disconnectPeerBtn.onclick = () => {
-                SoundFX.playClick();
-                handleConnectionClose();
-            };
+        /**
+         * STREAMING_CHUNK:Implementing Rateless LT Fountain Code Sender Generator...
+         */
+        async function startLtFountainTransmission() {
+            let fileBuf = null;
+            let metaName = 'SonicDrop_Note.txt';
+            let metaMime = 'text/plain';
+
+            if (activeTab === 'text') {
+                const val = textInputArea.value.trim();
+                if (!val) { showNotice("No Text", "Please enter text to transmit."); return; }
+                const encoder = new TextEncoder();
+                fileBuf = encoder.encode(val).buffer;
+            } else {
+                if (selectedFiles.length === 0) { showNotice("No File", "Please select a file to transmit."); return; }
+                const f = selectedFiles[0];
+                metaName = f.name;
+                metaMime = f.type || 'application/octet-stream';
+                fileBuf = await f.arrayBuffer();
+            }
+
+            requestWakeLock();
+            ltFileHash = await computeSha256Hex(fileBuf);
+            ltSessionId = Math.random().toString(36).substring(2, 8);
+            ltBlockSize = parseInt(bytesPerFrameSelect.value) || 1000;
+            
+            const uint8View = new Uint8Array(fileBuf);
+            const totalBytes = uint8View.byteLength;
+            ltBlockCount = Math.ceil(totalBytes / ltBlockSize);
+
+            ltSourceBlocks = [];
+            for (let i = 0; i < ltBlockCount; i++) {
+                const start = i * ltBlockSize;
+                const end = Math.min(start + ltBlockSize, totalBytes);
+                const blockSlice = new Uint8Array(ltBlockSize);
+                blockSlice.set(uint8View.subarray(start, end));
+                ltSourceBlocks.push(blockSlice);
+            }
+
+            ltSeqCounter = 0;
+            const numericPinDisplayBox = document.getElementById('numericPinDisplayBox');
+            if (numericPinDisplayBox) numericPinDisplayBox.classList.add('hidden');
+
+            senderControls.classList.add('hidden');
+            qrCard.classList.remove('hidden');
+
+            const activeCount = parseInt(qrLayoutSelect.value) || 1;
+            rebuildMultiQrGrid(activeCount);
+
+            if (qrStreamInterval) clearInterval(qrStreamInterval);
+            const fps = parseInt(txFpsSelect.value) || 15;
+            const ec = qrEcSelect.value || 'L';
+
+            qrStreamInterval = setInterval(() => {
+                for (let q = 0; q < activeCount; q++) {
+                    const dropSeed = (ltSeqCounter * 2654435761 + 1013904223) >>> 0;
+                    const prng = createPrng(dropSeed);
+                    const degree = sampleSolitonDegree(prng, ltBlockCount);
+
+                    const idxSet = new Set();
+                    while (idxSet.size < degree) {
+                        idxSet.add(Math.floor(prng() * ltBlockCount));
+                    }
+                    const indices = Array.from(idxSet);
+
+                    let xoredPayload = new Uint8Array(ltBlockSize);
+                    xoredPayload.set(ltSourceBlocks[indices[0]]);
+                    for (let i = 1; i < indices.length; i++) {
+                        xoredPayload = xorUint8Arrays(xoredPayload, ltSourceBlocks[indices[i]]);
+                    }
+
+                    const b64Data = arrayBufferToBase64(xoredPayload.buffer);
+                    const crcVal = crc32(b64Data);
+
+                    const frameObj = {
+                        sessionId: ltSessionId,
+                        seq: ltSeqCounter,
+                        fileSize: totalBytes,
+                        blockCount: ltBlockCount,
+                        blockSize: ltBlockSize,
+                        fileHash: ltFileHash,
+                        degree: degree,
+                        seed: dropSeed,
+                        name: metaName,
+                        mime: metaMime,
+                        payload: b64Data,
+                        crc: crcVal
+                    };
+
+                    const frameJson = JSON.stringify(frameObj);
+                    const canvasElem = document.getElementById(`qrCanvasGrid_${q}`);
+                    if (canvasElem && typeof QRious !== 'undefined') {
+                        new QRious({ element: canvasElem, size: 360, level: ec, value: frameJson });
+                    }
+
+                    const frameInfoText = document.getElementById('frameInfoText');
+                    if (frameInfoText) {
+                        frameInfoText.innerText = `LT Fountain Drop #${ltSeqCounter} (K=${ltBlockCount} • CRC:${crcVal})`;
+                    }
+                    ltSeqCounter++;
+                }
+            }, Math.round(1000 / fps));
+        }
+
+        function rebuildMultiQrGrid(count) {
+            const container = document.getElementById('multiQrGridContainer');
+            if (!container) return;
+            container.className = count === 4 ? 'qr-grid-4' : (count === 2 ? 'qr-grid-2' : 'qr-grid-1');
+            container.innerHTML = '';
+
+            for (let q = 0; q < count; q++) {
+                const canvas = document.createElement('canvas');
+                canvas.id = `qrCanvasGrid_${q}`;
+                canvas.width = 360;
+                canvas.height = 360;
+                canvas.className = "rounded-xl bg-white p-2 border border-slate-200 dark:border-slate-700 qr-canvas-responsive shadow-sm mx-auto object-contain";
+                container.appendChild(canvas);
+            }
         }
 
         /**
-         * STREAMING_CHUNK:Configuring PeerJS signaling and WebRTC lifecycle...
+         * STREAMING_CHUNK:Configuring Web Workers and Camera Decoder...
+         */
+        startStreamBtn.onclick = async () => {
+            SoundFX.playClick();
+            if (transferProtocol === 'qr') {
+                await startLtFountainTransmission();
+            } else {
+                if (peerConn && peerConn.open) {
+                    await startWifiFileTransfer();
+                } else {
+                    startWifiPairingBroadcasting();
+                }
+            }
+        };
+
+        connectPinBtn.onclick = () => {
+            SoundFX.playClick();
+            const pin = manualPinInput.value.trim();
+            if (pin.length === 6) connectToPeer(`sonic-${pin}`);
+        };
+
+        startScanBtn.onclick = () => { SoundFX.playClick(); openCameraScanner(); };
+        closeScannerBtn.onclick = () => { SoundFX.playClick(); stopCameraScanner(); };
+
+        async function openCameraScanner() {
+            requestWakeLock();
+            if (scannerBox) scannerBox.classList.remove('hidden');
+            if (typeof Html5Qrcode !== 'undefined') {
+                qrScanner = new Html5Qrcode("qrReader");
+                try {
+                    await qrScanner.start({ facingMode: "environment" }, { fps: 30, qrbox: 240 }, onQrScanned);
+                } catch(e) {
+                    showNotice("Camera Error", "Unable to access camera viewfinder.");
+                }
+            }
+        }
+
+        function stopCameraScanner() {
+            releaseWakeLock();
+            if (qrScanner) {
+                qrScanner.stop().then(() => { qrScanner = null; }).catch(() => {});
+            }
+            if (scannerBox) scannerBox.classList.add('hidden');
+        }
+
+        function onQrScanned(decodedText) {
+            try {
+                if (decodedText.startsWith('P2P:')) {
+                    const targetId = decodedText.split(':')[1];
+                    stopCameraScanner();
+                    connectToPeer(targetId);
+                } else if (decodedText.startsWith('{')) {
+                    // Send off-thread to WebWorker
+                    decoderWorker.postMessage({ type: 'PARSE_FRAME', rawText: decodedText });
+                }
+            } catch(e) {}
+        }
+
+        /**
+         * STREAMING_CHUNK:Receiving Worker Messages for LT Decoding & Reconstruction...
+         */
+        let rxK = 0;
+        let rxTotalBytes = 0;
+
+        decoderWorker.onmessage = async function(e) {
+            const msg = e.data;
+            if (msg.type === 'PROGRESS') {
+                if (!rxK || rxK !== msg.blockCount) {
+                    rxK = msg.blockCount;
+                    rxTotalBytes = msg.fileSize;
+                    rxStartTime = Date.now();
+                    progressBox.classList.remove('hidden');
+                    fileInfoBadge.innerText = `${msg.fileName} (${Math.round(msg.fileSize/1024)} KB)`;
+                    createMatrixGrid(rxK);
+                }
+
+                const pct = Math.min(100, Math.round((msg.resolvedCount / rxK) * 100));
+                progressBarFill.style.width = `${pct}%`;
+                progressPercent.innerText = `${pct}%`;
+                chunkCountText.innerText = `${msg.resolvedCount}/${rxK} Blocks (${msg.collectedDrops} Drops)`;
+
+                for (let i = 0; i < rxK; i++) {
+                    const box = document.getElementById(`chunk-box-${i}`);
+                    if (box && i < msg.resolvedCount) {
+                        box.className = 'w-2 h-2 rounded-sm bg-emerald-500 shadow-[0_0_6px_#10b981] transition-all';
+                    }
+                }
+
+                const elapsed = (Date.now() - rxStartTime) / 1000;
+                if (elapsed > 0) {
+                    const estBytes = (msg.resolvedCount / rxK) * rxTotalBytes;
+                    const kbSec = (estBytes / elapsed) / 1024;
+                    rxSpeedText.innerText = `${Math.round(kbSec)} KB/s`;
+                    const remBytes = Math.max(0, rxTotalBytes - estBytes);
+                    const eta = Math.max(0, Math.ceil(remBytes / (estBytes / elapsed)));
+                    rxEtaText.innerText = `ETA: ~${eta}s`;
+                }
+
+                SoundFX.playChirp();
+            } else if (msg.type === 'COMPLETE') {
+                stopCameraScanner();
+                progressBox.classList.add('hidden');
+                
+                const reassembledBuf = msg.buffer;
+                const computedHash = await computeSha256Hex(reassembledBuf);
+                const isValid = (computedHash === msg.fileHash);
+
+                const receivedIntegrityStatus = document.getElementById('receivedIntegrityStatus');
+                if (receivedIntegrityStatus) {
+                    if (isValid) {
+                        receivedIntegrityStatus.innerText = "✓ Integrity Verified (SHA-256 Match)";
+                        receivedIntegrityStatus.className = "text-xs font-extrabold text-emerald-600 dark:text-emerald-400";
+                    } else {
+                        receivedIntegrityStatus.innerText = "✗ Hash Checksum Mismatch (Corrupted Transfer)";
+                        receivedIntegrityStatus.className = "text-xs font-extrabold text-rose-600 dark:text-rose-400";
+                    }
+                }
+
+                const blob = new Blob([reassembledBuf], { type: msg.fileMime });
+                if (msg.fileMime === 'text/plain') {
+                    scannedTextContent.value = await blob.text();
+                    receivedTextBox.classList.remove('hidden');
+                } else {
+                    addReceivedFileCard(blob, msg.fileName, computedHash);
+                }
+
+                receivedBox.classList.remove('hidden');
+                SoundFX.playSuccess();
+                rxK = 0;
+            }
+        };
+
+        function createMatrixGrid(total) {
+            const chunkMatrix = document.getElementById('chunkMatrix');
+            if (!chunkMatrix) return;
+            chunkMatrix.innerHTML = '';
+            for (let i = 0; i < total; i++) {
+                const div = document.createElement('div');
+                div.className = 'w-2 h-2 rounded-sm bg-slate-200 dark:bg-slate-700 transition-all';
+                div.id = `chunk-box-${i}`;
+                chunkMatrix.appendChild(div);
+            }
+        }
+
+        function addReceivedFileCard(blob, name, hashHex = '') {
+            const url = URL.createObjectURL(blob);
+            const div = document.createElement('div');
+            div.className = "p-2 bg-white dark:bg-slate-800 rounded-xl border border-emerald-200 dark:border-emerald-800 flex items-center justify-between text-xs shadow-sm";
+            div.innerHTML = `
+                <div class="truncate pr-2 text-left">
+                    <div class="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[150px]">${name}</div>
+                    <div class="text-[8px] text-emerald-600 dark:text-emerald-400 mono-font">SHA: ${hashHex.substring(0,8)}</div>
+                </div>
+                <a href="${url}" download="${name}" class="download-link px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] rounded-lg uppercase">Save</a>
+            `;
+            if (receivedBatchList) receivedBatchList.appendChild(div);
+
+            const downloadLink = div.querySelector('.download-link');
+            if (downloadLink) {
+                downloadLink.onclick = () => {
+                    setTimeout(() => URL.revokeObjectURL(url), 10000);
+                };
+            }
+        }
+
+        /**
+         * STREAMING_CHUNK:Configuring PeerJS WebRTC direct channel logic...
          */
         function createPeer(id) {
             try {
@@ -981,19 +1603,6 @@
                 const p = new Peer(id);
                 p.on('open', (assignedId) => {
                     if (userPeerIdText) userPeerIdText.innerText = `ID: fly#${assignedId.replace('sonic-', '')}`;
-                    if (connectionStatusDot) connectionStatusDot.className = 'absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 rounded-full border border-white';
-                    if (headerStatusBadge) headerStatusBadge.innerText = 'Online';
-                });
-                p.on('disconnected', () => {
-                    if (connectionStatusDot) connectionStatusDot.className = 'absolute bottom-0 right-0 w-2 h-2 bg-amber-500 rounded-full border border-white';
-                    if (headerStatusBadge) headerStatusBadge.innerText = 'Disconnected';
-                });
-                p.on('close', () => {
-                    if (connectionStatusDot) connectionStatusDot.className = 'absolute bottom-0 right-0 w-2 h-2 bg-slate-400 rounded-full border border-white';
-                });
-                p.on('error', (err) => {
-                    console.warn("PeerJS Error:", err);
-                    if (headerStatusBadge) headerStatusBadge.innerText = 'Error';
                 });
                 return p;
             } catch(e) {
@@ -1050,40 +1659,6 @@
             }, 100);
         }
 
-        function connectToPeer(targetId) {
-            if (!peer || peer.destroyed) peer = createPeer();
-            if (!peer) return;
-            const conn = peer.connect(targetId, { reliable: true });
-            conn.on('open', () => {
-                peerConn = conn;
-                setupDataChannel(conn);
-                showActiveConnectionBadge('Connected Device', targetId);
-                syncProtocolUI();
-                SoundFX.playSuccess();
-            });
-            conn.on('error', (err) => {
-                showNotice("Connection Error", "Unable to connect to target device.");
-            });
-        }
-
-        function showActiveConnectionBadge(name, peerId) {
-            if (activeConnectionCard) activeConnectionCard.classList.remove('hidden');
-            if (connPeerNameText) connPeerNameText.innerText = name;
-            if (connPeerIdText) connPeerIdText.innerText = `fly#${peerId.replace('sonic-', '')}`;
-        }
-
-        function handleConnectionClose() {
-            if (peerConn) {
-                try { peerConn.close(); } catch(e) {}
-                peerConn = null;
-            }
-            if (activeConnectionCard) activeConnectionCard.classList.add('hidden');
-            syncProtocolUI();
-        }
-
-        /**
-         * STREAMING_CHUNK:Implementing 64KB WebRTC Chunked DataChannel Transport...
-         */
         function setupDataChannel(conn) {
             conn.on('data', async (data) => {
                 if (!data) return;
@@ -1096,43 +1671,27 @@
                     rxFileMap.set(data.id, {
                         name: data.name,
                         mime: data.mime,
-                        totalBytes: Number(data.totalBytes) || 1,
-                        totalChunks: Number(data.totalChunks) || 1,
+                        totalBytes: data.totalBytes,
+                        totalChunks: data.totalChunks,
                         chunks: new Array(data.totalChunks),
                         receivedChunks: 0,
                         receivedBytes: 0,
-                        startTime: Date.now(),
-                        expectedHash: data.hash
+                        startTime: Date.now()
                     });
                     if (progressBox) progressBox.classList.remove('hidden');
-                    if (fileInfoBadge) fileInfoBadge.innerText = `${data.name} (${Math.round((data.totalBytes || 0)/1024)} KB)`;
-                    if (progressTitle) progressTitle.innerText = `Receiving ${data.name}...`;
+                    if (fileInfoBadge) fileInfoBadge.innerText = `${data.name} (${Math.round(data.totalBytes/1024)} KB)`;
                 } else if (data.type === 'FILE_CHUNK') {
                     const item = rxFileMap.get(data.id);
-                    if (item && item.totalChunks > 0) {
+                    if (item) {
                         const chunkBytes = base64ToUint8Array(data.chunk);
-                        // Prevent duplicate chunk double-counting
                         if (!item.chunks[data.index]) {
                             item.chunks[data.index] = chunkBytes;
                             item.receivedChunks++;
                             item.receivedBytes += chunkBytes.byteLength;
                         }
-
-                        // Strictly clamp progress percentage between 0% and 100%
-                        const pct = Math.min(100, Math.max(0, Math.round((item.receivedChunks / item.totalChunks) * 100)));
+                        const pct = Math.min(100, Math.round((item.receivedChunks / item.totalChunks) * 100));
                         if (progressBarFill) progressBarFill.style.width = `${pct}%`;
                         if (progressPercent) progressPercent.innerText = `${pct}%`;
-                        if (chunkCountText) chunkCountText.innerText = `${item.receivedChunks}/${item.totalChunks} Chunks`;
-
-                        const elapsed = (Date.now() - item.startTime) / 1000;
-                        if (elapsed > 0 && item.receivedBytes > 0) {
-                            const bytesPerSec = item.receivedBytes / elapsed;
-                            const kbSec = bytesPerSec / 1024;
-                            if (rxSpeedText) rxSpeedText.innerText = `${Math.round(kbSec)} KB/s`;
-                            const remBytes = Math.max(0, item.totalBytes - item.receivedBytes);
-                            const etaSec = Math.max(0, Math.ceil(remBytes / bytesPerSec));
-                            if (rxEtaText) rxEtaText.innerText = `ETA: ~${etaSec}s`;
-                        }
                     }
                 } else if (data.type === 'FILE_END') {
                     const item = rxFileMap.get(data.id);
@@ -1144,9 +1703,9 @@
                         for (let c of item.chunks) {
                             if (c) { fullBuf.set(c, off); off += c.byteLength; }
                         }
-                        const calculatedSha = await computeSha256Hex(fullBuf.buffer);
+                        const hashHex = await computeSha256Hex(fullBuf.buffer);
                         const blob = new Blob([fullBuf], { type: item.mime || 'application/octet-stream' });
-                        addReceivedFileCard(blob, item.name, calculatedSha);
+                        addReceivedFileCard(blob, item.name, hashHex);
                         rxFileMap.delete(data.id);
                         if (progressBox) progressBox.classList.add('hidden');
                         if (receivedBox) receivedBox.classList.remove('hidden');
@@ -1161,36 +1720,29 @@
 
         async function sendFileWebRTC(file) {
             if (!peerConn || !peerConn.open) return;
-
             const fileId = Math.random().toString(36).substring(2, 9);
-            const CHUNK_SIZE = 65536; // 64KB
+            const CHUNK_SIZE = 65536;
             const totalBytes = file.size;
             const totalChunks = Math.ceil(totalBytes / CHUNK_SIZE);
-            const mime = file.type || 'application/octet-stream';
-
             const fileBuf = await file.arrayBuffer();
-            const fileHash = await computeSha256Hex(fileBuf);
 
             peerConn.send({
                 type: 'FILE_START',
                 id: fileId,
                 name: file.name,
-                mime: mime,
+                mime: file.type || 'application/octet-stream',
                 totalBytes: totalBytes,
-                totalChunks: totalChunks,
-                hash: fileHash
+                totalChunks: totalChunks
             });
 
             const uint8View = new Uint8Array(fileBuf);
             let chunkIdx = 0;
 
             while (chunkIdx < totalChunks) {
-                // Backpressure Check
                 if (peerConn.dataChannel && peerConn.dataChannel.bufferedAmount > 256 * 1024) {
                     await new Promise(r => setTimeout(r, 20));
                     continue;
                 }
-
                 const start = chunkIdx * CHUNK_SIZE;
                 const end = Math.min(start + CHUNK_SIZE, totalBytes);
                 const chunkSlice = uint8View.subarray(start, end);
@@ -1201,15 +1753,10 @@
                     index: chunkIdx,
                     chunk: arrayBufferToBase64(chunkSlice.buffer)
                 });
-
                 chunkIdx++;
             }
 
-            peerConn.send({
-                type: 'FILE_END',
-                id: fileId
-            });
-
+            peerConn.send({ type: 'FILE_END', id: fileId });
             SoundFX.playSuccess();
         }
 
@@ -1227,10 +1774,9 @@
                 showNotice("Sent", "Text transmitted successfully.");
             } else {
                 if (selectedFiles.length === 0) {
-                    showNotice("No File Selected", "Please select file(s) to send.");
+                    showNotice("No File", "Please select file(s) to send.");
                     return;
                 }
-
                 for (const file of selectedFiles) {
                     await sendFileWebRTC(file);
                 }
@@ -1271,225 +1817,35 @@
             if (qrCard) qrCard.classList.remove('hidden');
         }
 
-        /**
-         * STREAMING_CHUNK:Implementing Decimen-style Animated QR Transport...
-         */
-        async function startQrStreamTransmission() {
-            let fileDataBuf = null;
-            let metaName = 'TEXT.TXT';
-            let metaMime = 'TEXT/PLAIN';
-
-            if (activeTab === 'text') {
-                const val = textInputArea.value.trim();
-                if (!val) { showNotice("No Text", "Please enter text to transmit."); return; }
-                const encoder = new TextEncoder();
-                fileDataBuf = encoder.encode(val).buffer;
-            } else {
-                if (selectedFiles.length === 0) { showNotice("No File", "Please select a file to transmit."); return; }
-                const primaryFile = selectedFiles[0];
-                metaName = primaryFile.name;
-                metaMime = primaryFile.type || 'application/octet-stream';
-                fileDataBuf = await primaryFile.arrayBuffer();
-            }
-
-            const fileHash = await computeSha256Hex(fileDataBuf);
-            const uint8View = new Uint8Array(fileDataBuf);
-            const CHUNK_SIZE = 450; // Safe QR size
-            const totalChunks = Math.ceil(uint8View.byteLength / CHUNK_SIZE);
-
-            const qrPackets = [];
-            for (let i = 0; i < totalChunks; i++) {
-                const start = i * CHUNK_SIZE;
-                const end = Math.min(start + CHUNK_SIZE, uint8View.byteLength);
-                const chunkSlice = uint8View.subarray(start, end);
-                const b64Data = arrayBufferToBase64(chunkSlice.buffer);
-                const crcVal = crc32(b64Data);
-
-                qrPackets.push(JSON.stringify({
-                    type: "QR_CHUNK",
-                    index: i,
-                    total: totalChunks,
-                    crc: crcVal,
-                    name: metaName,
-                    mime: metaMime,
-                    sha256: fileHash,
-                    data: b64Data
-                }));
-            }
-
-            if (numericPinDisplayBox) numericPinDisplayBox.classList.add('hidden');
-            if (senderControls) senderControls.classList.add('hidden');
-            if (qrCard) qrCard.classList.remove('hidden');
-
-            let currentFrame = 0;
-            const canvasElem = document.getElementById('qrCanvasGrid_0');
-
-            if (qrStreamInterval) clearInterval(qrStreamInterval);
-            qrStreamInterval = setInterval(() => {
-                if (!qrPackets[currentFrame] || !canvasElem) return;
-                new QRious({ element: canvasElem, size: 320, value: qrPackets[currentFrame] });
-                const frameInfoText = document.getElementById('frameInfoText');
-                if (frameInfoText) frameInfoText.innerText = `Frame ${currentFrame + 1} of ${totalChunks} (CRC: ${JSON.parse(qrPackets[currentFrame]).crc})`;
-                currentFrame = (currentFrame + 1) % totalChunks;
-            }, 120); // ~8 FPS for clear scanning
+        function connectToPeer(targetId) {
+            if (!peer || peer.destroyed) peer = createPeer();
+            if (!peer) return;
+            const conn = peer.connect(targetId, { reliable: true });
+            conn.on('open', () => {
+                peerConn = conn;
+                setupDataChannel(conn);
+                showActiveConnectionBadge('Connected Device', targetId);
+                syncProtocolUI();
+                SoundFX.playSuccess();
+            });
         }
 
-        /**
-         * STREAMING_CHUNK:Configuring camera scanner and frame receiver logic...
-         */
-        startStreamBtn.onclick = async () => {
-            SoundFX.playClick();
-            if (transferProtocol === 'qr') {
-                await startQrStreamTransmission();
-            } else {
-                if (peerConn && peerConn.open) {
-                    await startWifiFileTransfer();
-                } else {
-                    startWifiPairingBroadcasting();
-                }
-            }
-        };
-
-        connectPinBtn.onclick = () => {
-            SoundFX.playClick();
-            const pin = manualPinInput.value.trim();
-            if (pin.length === 6) connectToPeer(`sonic-${pin}`);
-        };
-
-        startScanBtn.onclick = () => { SoundFX.playClick(); openCameraScanner(); };
-        closeScannerBtn.onclick = () => { SoundFX.playClick(); stopCameraScanner(); };
-
-        async function openCameraScanner() {
-            if (scannerBox) scannerBox.classList.remove('hidden');
-            if (typeof Html5Qrcode !== 'undefined') {
-                qrScanner = new Html5Qrcode("qrReader");
-                try {
-                    await qrScanner.start({ facingMode: "environment" }, { fps: 24, qrbox: 220 }, onQrScanned);
-                } catch(e) {
-                    showNotice("Camera Error", "Unable to access camera viewfinder.");
-                }
-            }
+        function showActiveConnectionBadge(name, peerId) {
+            if (activeConnectionCard) activeConnectionCard.classList.remove('hidden');
+            if (connPeerNameText) connPeerNameText.innerText = name;
+            if (connPeerIdText) connPeerIdText.innerText = `fly#${peerId.replace('sonic-', '')}`;
         }
 
-        function stopCameraScanner() {
-            if (qrScanner) {
-                qrScanner.stop().then(() => { qrScanner = null; }).catch(() => {});
+        function handleConnectionClose() {
+            if (peerConn) {
+                try { peerConn.close(); } catch(e) {}
+                peerConn = null;
             }
-            if (scannerBox) scannerBox.classList.add('hidden');
+            if (activeConnectionCard) activeConnectionCard.classList.add('hidden');
+            syncProtocolUI();
         }
 
-        function onQrScanned(decodedText) {
-            try {
-                const parsed = JSON.parse(decodedText);
-                if (parsed.peerId) {
-                    stopCameraScanner();
-                    connectToPeer(parsed.peerId);
-                } else if (parsed.type === 'QR_CHUNK') {
-                    processQrChunkPacket(parsed);
-                }
-            } catch(e) {
-                if (decodedText.startsWith('P2P:')) {
-                    const targetId = decodedText.split(':')[1];
-                    stopCameraScanner();
-                    connectToPeer(targetId);
-                }
-            }
-        }
-
-        /**
-         * STREAMING_CHUNK:Processing incoming QR_CHUNK packets with CRC verification...
-         */
-        function processQrChunkPacket(packet) {
-            const { index, total, crc, data, name, mime, sha256 } = packet;
-
-            if (crc32(data) !== crc) {
-                console.warn("CRC Mismatch on QR chunk", index);
-                return;
-            }
-
-            if (!qrRxState || qrRxState.total !== total) {
-                qrRxState = {
-                    total: total,
-                    name: name,
-                    mime: mime,
-                    sha256: sha256,
-                    chunks: new Map(),
-                    startTime: Date.now()
-                };
-                if (progressBox) progressBox.classList.remove('hidden');
-                if (fileInfoBadge) fileInfoBadge.innerText = `${name} (${total} Frame Stream)`;
-            }
-
-            if (!qrRxState.chunks.has(index)) {
-                qrRxState.chunks.set(index, base64ToUint8Array(data));
-                SoundFX.playChirp();
-            }
-
-            const receivedCount = qrRxState.chunks.size;
-            const pct = Math.min(100, Math.max(0, Math.round((receivedCount / total) * 100)));
-            if (progressBarFill) progressBarFill.style.width = `${pct}%`;
-            if (progressPercent) progressPercent.innerText = `${pct}%`;
-            if (chunkCountText) chunkCountText.innerText = `${receivedCount}/${total} Frames`;
-
-            if (receivedCount === total) {
-                stopCameraScanner();
-                reconstructQrStreamPayload();
-            }
-        }
-
-        async function reconstructQrStreamPayload() {
-            let totalLen = 0;
-            for (let i = 0; i < qrRxState.total; i++) {
-                const c = qrRxState.chunks.get(i);
-                if (c) totalLen += c.byteLength;
-            }
-
-            const fullBuf = new Uint8Array(totalLen);
-            let off = 0;
-            for (let i = 0; i < qrRxState.total; i++) {
-                const c = qrRxState.chunks.get(i);
-                if (c) { fullBuf.set(c, off); off += c.byteLength; }
-            }
-
-            const calculatedHash = await computeSha256Hex(fullBuf.buffer);
-            const blob = new Blob([fullBuf], { type: qrRxState.mime });
-
-            if (progressBox) progressBox.classList.add('hidden');
-            if (qrRxState.mime === 'TEXT/PLAIN') {
-                if (scannedTextContent) scannedTextContent.value = await blob.text();
-                if (receivedTextBox) receivedTextBox.classList.remove('hidden');
-            } else {
-                addReceivedFileCard(blob, qrRxState.name, calculatedHash);
-            }
-            if (receivedBox) receivedBox.classList.remove('hidden');
-            SoundFX.playSuccess();
-            qrRxState = null;
-        }
-
-        /**
-         * STREAMING_CHUNK:Managing received file card creation and memory cleanup...
-         */
-        function addReceivedFileCard(blob, name, checksumSha = '') {
-            const url = URL.createObjectURL(blob);
-            const div = document.createElement('div');
-            div.className = "p-2 bg-white dark:bg-slate-800 rounded-xl border border-emerald-200 dark:border-emerald-800 flex items-center justify-between text-xs shadow-sm";
-            div.innerHTML = `
-                <div class="truncate pr-2">
-                    <div class="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[150px]">${name}</div>
-                    <div class="text-[8px] text-emerald-600 dark:text-emerald-400 mono-font">SHA: ${checksumSha.substring(0,8)} ✓</div>
-                </div>
-                <a href="${url}" download="${name}" class="download-link px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] rounded-lg uppercase">Save</a>
-            `;
-            if (receivedBatchList) receivedBatchList.appendChild(div);
-
-            const downloadLink = div.querySelector('.download-link');
-            if (downloadLink) {
-                downloadLink.onclick = () => {
-                    setTimeout(() => URL.revokeObjectURL(url), 10000);
-                };
-            }
-        }
-
+        if (disconnectPeerBtn) disconnectPeerBtn.onclick = () => handleConnectionClose();
         if (copyTextBtn) {
             copyTextBtn.onclick = () => {
                 SoundFX.playClick();
@@ -1510,8 +1866,7 @@
         if (cancelReceiveBtn) cancelReceiveBtn.onclick = () => {
             if (progressBox) progressBox.classList.add('hidden');
             stopCameraScanner();
-            rxFileMap.clear();
-            qrRxState = null;
+            decoderWorker.postMessage({ type: 'RESET' });
         };
     </script>
 </body>
